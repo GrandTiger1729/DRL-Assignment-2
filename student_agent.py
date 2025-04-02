@@ -1,24 +1,11 @@
 import pickle
 
-from game2048env import Game2048Env
-from approximator import NTupleApproximator
-
-def get_best_action(env, approximator, legal_moves, gamma=0.99):
-    score = env.score
-    GameEnv = type(env)
-    temp_env = GameEnv()
-    def value(action):
-        temp_env.board = env.cache_after_states[action][0].copy()
-        temp_env.add_random_tile()
-        next_state = temp_env.board
-        new_score = env.cache_after_states[action][1]
-        if temp_env.is_game_over():
-            new_score = 0
-        return new_score - score + gamma * approximator.value(next_state)
-    return max(legal_moves, key=value)
+from game import Game2048Env
+from ntuple_approximator import NTupleApproximator
+from ntuple_action import get_best_action
 
 env = Game2048Env()  # Initialize the game environment
-with open('n_tuple_approximator.pkl', 'rb') as f:
+with open('ntuple_approximator.pkl', 'rb') as f:
     approximator = pickle.load(f)
 
 def get_action(state, score):
