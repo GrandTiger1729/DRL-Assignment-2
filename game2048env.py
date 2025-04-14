@@ -27,6 +27,7 @@ class Game2048Env(gym.Env):
         self.size = 4  # 4x4 2048 board
         self.board = np.zeros((self.size, self.size), dtype=int)
         self.score = 0
+        self.step_count = 0
 
         # Action space: 0: up, 1: down, 2: left, 3: right
         self.action_space = spaces.Discrete(4)
@@ -91,6 +92,9 @@ class Game2048Env(gym.Env):
         """Execute one action"""
         assert self.action_space.contains(action), "Invalid action"
 
+        # previous_score = self.score
+        previous_score = self.evaluate()
+
         if self.cache_after_states[action] is None:
             self.simulate_move(action)
         
@@ -100,10 +104,72 @@ class Game2048Env(gym.Env):
             self.score = new_score
             self.cache_after_states = [None] * 4  # Clear cache after a valid move
             self.add_random_tile()
-
+            self.step_count += 1
+        
         done = self.is_game_over()
 
-        return self.board.copy(), self.score, done, {}
+        return self.board.copy(), self.score - previous_score, done
+        # return self.board.copy(), self.evaluate() - previous_score, done
+
+    def evaluate(self):
+        adj_score = [0.0] * 4
+
+        # Horizontal smoothness and monotonicity
+        for i in range(4):
+            j = 0
+            while j < 4 and self.board[i][j] == 0:
+                j += 1
+            if j < 4:
+                k = j + 1
+                while k < 4:
+                    while k < 4 and self.board[i][k] == 0:
+                        k += 1
+                    if k == 4:
+                        break
+                    if self.board[i][j] < self.board[i][k]:
+                        adj_score[0] += np.log2(self.board[i][k]) - np.log2(self.board[i][j])
+                    elif self.board[i][j] > self.board[i][k]:
+                        adj_score[1] += np.log2(self.board[i][j]) - np.log2(self.board[i][k])
+                    j = k
+                    k += 1
+
+        # Vertical smoothness and monotonicity
+        for j in range(4):
+            i = 0
+            while i < 4 and self.board[i][j] == 0:
+                i += 1
+            if i < 4:
+                k = i + 1
+                while k < 4:
+                    while k < 4 and self.board[k][j] == 0:
+                        k += 1
+                    if k == 4:
+                        break
+                    if self.board[i][j] < self.board[k][j]:
+                        adj_score[2] += np.log2(self.board[k][j]) - np.log2(self.board[i][j])
+                    elif self.board[i][j] > self.board[k][j]:
+                        adj_score[3] += np.log2(self.board[i][j]) - np.log2(self.board[k][j])
+                    i = k
+                    k += 1
+
+        smoothness = sum(adj_score)
+        mono = max(adj_score[0], adj_score[1]) + max(adj_score[2], adj_score[3])
+
+        # Count empty cells
+        empty_cells = sum(1 for i in range(4) for j in range(4) if self.board[i][j] == 0)
+
+        # Check if the game is over
+        done = self.is_game_over()
+
+        # Calculate evaluation score
+        eval_score = (
+            self.score
+            - 0.1 * smoothness
+            + 1 * mono
+            + 2.7 * empty_cells
+            - 1e5 * done
+        )
+        return eval_score
 
     def render(self, mode="human", action=None):
         """
@@ -193,6 +259,7 @@ class Game2048Env(gym.Env):
         # Cache the after state for the action
         self.cache_after_states[action] = (temp_board, score, moved)
         
+        return self.cache_after_states[action]
 
     def is_move_legal(self, action):
         """Check if the specified move is legal (i.e., changes the board)"""
@@ -203,3 +270,7 @@ class Game2048Env(gym.Env):
         temp_board, temp_score, moved = self.cache_after_states[action]
         # If the simulated board is different from the current board, the move is legal
         return moved
+    
+    def get_legal_moves(self):
+        """Get all legal moves"""
+        return [a for a in range(4) if self.is_move_legal(a)]

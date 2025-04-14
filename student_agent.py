@@ -1,23 +1,47 @@
-import pickle
+import numpy as np
 
-from game import Game2048Env
+from game2048env import Game2048Env
 from ntuple_approximator import NTupleApproximator
-from ntuple_action import get_best_action
+from td_mcts_2048 import TD_MCTS, TD_MCTS_Node
 
-env = Game2048Env()  # Initialize the game environment
-with open('ntuple_approximator.pkl', 'rb') as f:
-    approximator = pickle.load(f)
+
+approximator = NTupleApproximator()
+approximator.load()
+step_count = 0
 
 def get_action(state, score):
-    global env, approximator
+    global approximator, step_count
 
+    env = Game2048Env()
     env.board = state.copy()
     env.score = score
-    env.cache_after_states = [None] * 4  # Reset cache for the current state
 
-    legal_moves = [a for a in range(4) if env.is_move_legal(a)]
-    if not legal_moves:
-        return None  # No legal moves available
-    best_action = get_best_action(env, approximator, legal_moves)
+    # legal_moves = env.get_legal_moves()
+    # assert legal_moves, "No legal moves available."
 
-    return best_action  # Choose the best action based on evaluation
+    # # Choose the best action using TD(0) greedy
+    # values = []
+    # for action in legal_moves:
+    #     temp_env = Game2048Env()
+    #     temp_env.board = env.board.copy()
+    #     temp_env.score = env.score
+    #     next_state, reward, _done = temp_env.step(action)
+    #     values.append(reward + approximator.get_value(next_state))
+
+    # best_action = legal_moves[np.argmax(values)]
+
+    # return best_action
+
+    td_mcts = TD_MCTS(approximator, iterations=100, exploration_constant=100, rollout_depth=0)
+
+    root = TD_MCTS_Node()
+    for _ in range(td_mcts.iterations):
+        td_mcts.run_simulation(root, env)
+
+    best_action, distribution = td_mcts.best_action_distribution(root)
+
+    step_count += 1
+    if step_count % 100 == 0:
+        print(f"Step: {step_count}, Score: {score}.")
+    
+    return best_action

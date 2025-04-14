@@ -1,67 +1,78 @@
-import copy
-import math
-from collections import defaultdict
+import numpy as np
+
+PATTERNS = [
+    [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)],
+    [(0, 1), (0, 2), (1, 1), (1, 2), (2, 1), (3, 1)],
+    [(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1)],
+    [(0, 0), (0, 1), (1, 1), (1, 2), (1, 3), (2, 2)],
+    [(0, 0), (0, 1), (0, 2), (1, 1), (2, 1), (2, 2)],
+    [(0, 0), (0, 1), (1, 1), (2, 1), (3, 1), (3, 2)],
+    [(0, 0), (0, 1), (1, 1), (2, 0), (2, 1), (3, 1)],
+    [(0, 0), (0, 1), (0, 2), (1, 0), (1, 2), (2, 2)],
+]
 
 class NTupleApproximator:
-    def __init__(self, board_size, patterns):
-        """
-        Initializes the N-Tuple approximator.
-        Hint: you can adjust these if you want
-        """
-        self.board_size = board_size
+    def __init__(self, patterns=PATTERNS):
         self.patterns = patterns
-        # Create a weight dictionary for each pattern (shared within a pattern group)
-        self.weights = [defaultdict(float) for _ in patterns]
-        # Generate symmetrical transformations for each pattern
-        self.symmetry_patterns = []
-        for group, pattern in enumerate(self.patterns):
-            syms = self.generate_symmetries(pattern)
-            for syms_ in syms:
-                self.symmetry_patterns.append((syms_, group))
+        self.symmetry_patterns = [[] for _ in range(len(patterns))]
+        self.weights = []
 
-    def rot90(self, coord):
-        row, col = coord
-        return col, self.board_size - 1 - row
+        for k in range(len(patterns)):
+            # Initialize weights
+            self.weights.append([4e4] * (15 ** len(patterns[k])))  # or use appropriate initialization
+            
+            # Generate symmetry patterns
+            symmetry_pattern = patterns[k]
+            for I in range(2):
+                for J in range(4):
+                    self.symmetry_patterns[k].append(symmetry_pattern.copy())
+                    # rotate 90 degrees
+                    for i in range(len(symmetry_pattern)):
+                        x, y = symmetry_pattern[i]
+                        symmetry_pattern[i] = (y, 3 - x)
+                # reflect over y-axis
+                for i in range(len(symmetry_pattern)):
+                    symmetry_pattern[i] = (3 - symmetry_pattern[i][0], symmetry_pattern[i][1])
 
-    def reflect(self, coord):
-        row, col = coord
-        return self.board_size - 1 - row, col
+    def get_feature(self, grid, pattern):
+        feature = []
+        for x, y in pattern:
+            feature.append(int(np.log2(grid[x][y])) if grid[x][y] != 0 else 0)
+        return feature
 
-    def generate_symmetries(self, pattern):
-        # TODO: Generate 8 symmetrical transformations of the given pattern.
-        patterns = []
-        pattern = copy.deepcopy(pattern)
-        for _ in range(4):
-            for __ in range(2):
-                patterns.append(tuple(pattern))
-                pattern = [self.reflect(coord) for coord in pattern]
-            pattern = [self.rot90(coord) for coord in pattern]
-        return patterns
+    def get_index(self, feature):
+        idx = 0
+        pw = 1
+        for f in feature:
+            idx += f * pw
+            pw *= 15
+        return idx
 
-    def tile_to_index(self, tile):
-        """
-        Converts tile values to an index for the lookup table.
-        """
-        if tile == 0:
-            return 0
-        else:
-            return int(math.log(tile, 2))
+    def get_value(self, grid):
+        value = 0
+        for k in range(len(self.patterns)):
+            for pattern in self.symmetry_patterns[k]:
+                feature = self.get_feature(grid, pattern)
+                idx = self.get_index(feature)
+                value += self.weights[k][idx]
 
-    def get_feature(self, board, coords):
-        # TODO: Extract tile values from the board based on the given coordinates and convert them into a feature tuple.
-        return tuple([self.tile_to_index(board[i, j]) for i, j in coords])
+        return value
 
-    def value(self, board):
-        # TODO: Estimate the board value: sum the evaluations from all patterns.
-        total = 0
-        for pattern, group in self.symmetry_patterns:
-            feature = self.get_feature(board, pattern)
-            total += self.weights[group][feature]
-        return total
+    def update(self, grid, delta, alpha):
+        for k in range(len(self.patterns)):
+            for pattern in self.symmetry_patterns[k]:
+                feature = self.get_feature(grid, pattern)
+                idx = self.get_index(feature)
+                self.weights[k][idx] += alpha * delta / len(self.patterns) / 8
 
-    def update(self, board, delta, alpha):
-        # TODO: Update weights based on the TD error.
-        for pattern, group in self.symmetry_patterns:
-            feature = self.get_feature(board, pattern)
-            self.weights[group][feature] += alpha * delta / len(self.symmetry_patterns)
+    def save(self, filename="weights.txt"):
+        with open(filename, 'w') as file:
+            for k in range(len(self.patterns)):
+                # Join weights for each pattern as space-separated values
+                file.write(' '.join(map(str, self.weights[k])) + '\n')
 
+    def load(self, filename="weights.txt"):
+        with open(filename, 'r') as file:
+            for k in range(len(self.patterns)):
+                # Read weights from the file for each pattern
+                self.weights[k] = list(map(float, file.readline().strip().split()))

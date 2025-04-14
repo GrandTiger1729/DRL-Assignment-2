@@ -5,8 +5,14 @@ __pycache__/
 .venv/
 .env
 *.lock
+.vscode/
 
 # ignore eval.py
 eval.py
 
 *.pkl
+weights.txt
+
+local/
+*.exe
+*.zip
