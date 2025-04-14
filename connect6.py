@@ -48,7 +48,7 @@ def evaluate_board(board: np.ndarray, color: int) -> float:
         return (me / 6) ** 3 - (opponent / 6)
 
 
-def recommended_moves(board: np.ndarray, color: int, size=5) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
     """Generates recommended moves for the given board and color."""
     n = board.shape[0]
     # Check instant win
@@ -73,26 +73,94 @@ def recommended_moves(board: np.ndarray, color: int, size=5) -> List[Tuple[Tuple
                                     return [(empty_cells[0], (_i, _j))]
                     if len(empty_cells) == 2:
                         return [tuple(empty_cells)]
-    
-    candidate_moves = []
-    for i1 in range(n):
-        for j1 in range(n):
-            if board[i1, j1] != 0:
-                continue
-            for i2 in range(n):
-                for j2 in range(n):
-                    if board[i2, j2] != 0  or i1 * n + j1 >= i2 * n + j2:
-                        continue
-                    temp_board = board.copy()
-                    temp_board[i1, j1] = color
-                    temp_board[i2, j2] = color
-                    candidate_moves.append(((i1, j1), (i2, j2), 1 - evaluate_board(temp_board, color)))
+    # Check for potential threats
+    visited = set()
+    dangerous_cells = []
+    for i in range(n):
+        for j in range(n):
+            for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
+                empty_cells = []
+                for k in range(6, 0, -1):
+                    ni = i + di * k
+                    nj = j + dj * k
+                    if not (0 <= ni < n and 0 <= nj < n):
+                        break
+                    if board[ni, nj] == color:
+                        break
+                    if board[ni, nj] == 0:
+                        empty_cells.append((ni, nj))
+                else:
+                    if len(empty_cells) == 1:
+                        if empty_cells[0] not in visited:
+                            dangerous_cells.append(empty_cells[0])
+                            visited.add(empty_cells[0])
+                    if len(empty_cells) == 2 and (abs(empty_cells[0][0] - empty_cells[1][0]) == 5 or abs(empty_cells[0][1] - empty_cells[1][1]) == 5):
+                        return [tuple(empty_cells)]
+                
+    if len(dangerous_cells) >= 2:
+        return [(dangerous_cells[0], dangerous_cells[1])]
 
-    candidate_moves.sort(key=lambda x: x[2], reverse=True)
-    recommended_moves = []
-    for i in range(min(size, len(candidate_moves))):
-        recommended_moves.append(((candidate_moves[i][0]), (candidate_moves[i][1])))
-    return recommended_moves
+    for i in range(n):
+        for j in range(n):
+            for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
+                empty_cells = []
+                for k in range(6, 0, -1):
+                    ni = i + di * k
+                    nj = j + dj * k
+                    if not (0 <= ni < n and 0 <= nj < n):
+                        break
+                    if board[ni, nj] == color:
+                        break
+                    if board[ni, nj] == 0:
+                        empty_cells.append((ni, nj))
+                else:
+                    if len(empty_cells) == 1:
+                        if empty_cells[0] not in visited:
+                            dangerous_cells.append(empty_cells[0])
+                            visited.add(empty_cells[0])
+                    if len(empty_cells) == 2:
+                        return [tuple(empty_cells)]
+                
+                if len(dangerous_cells) == 2:
+                    return [tuple(dangerous_cells)]
+
+    if len(dangerous_cells) == 1:
+        board[dangerous_cells[0]] = color
+        left = 1
+    else:
+        left = 2
+
+    # Find all possible pair which are close to each other
+    candidates = defaultdict(float) # ((ni, nj), (ni2, nj2)) -> score
+    for i in range(n):
+        for j in range(n):
+            for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
+                color_count = [0, 0, 0]
+                empty_cells = []
+                for k in range(6, 0, -1):
+                    ni = i + di * k
+                    nj = j + dj * k
+                    if not (0 <= ni < n and 0 <= nj < n):
+                        break
+                    color_count[board[ni, nj]] += 1
+                    if color_count[1] > 0 and color_count[2] > 0:
+                        break
+                    if board[ni, nj] == 0:
+                        empty_cells.append((ni, nj))
+                else:
+                    if left == 1:
+                        for x in empty_cells:
+                            candidates[(x, dangerous_cells[0])] += 2 * color_count[color] ** 2 + color_count[3 - color] ** 2
+                    else:
+                        for x in empty_cells:
+                            for y in empty_cells:
+                                if x != y:
+                                    candidates[(x, y)] += 2 * color_count[color] ** 2 + color_count[3 - color] ** 2
+    
+    best_moves = sorted(candidates.items(), key=lambda x: x[1], reverse=True)[:size * 2]
+    best_moves = [(x[0][0], x[0][1]) for i, x in enumerate(best_moves) if i % 2 == 0]
+    return best_moves
+
 
 class MCTSNode:
     def __init__(self, board: np.ndarray, color, parent=None):
@@ -110,7 +178,7 @@ class MCTSNode:
     
 
 class MCTS:
-    def __init__(self, iterations=50, exploration_constant=1.41):
+    def __init__(self, iterations=300, exploration_constant=1.41):
         self.iterations = iterations
         self.c = exploration_constant  # Balances exploration and exploitation
 
@@ -280,8 +348,10 @@ class Connect6Game:
             return
 
         if self.board.sum() == 0:
-            move_str = "J10"
+            move_str = "K10"
             self.play_move(color, move_str)
+
+            print(f"{move_str}\n\n", end='', flush=True)
             print(move_str, file=sys.stderr)
             return
         
@@ -365,8 +435,7 @@ class Connect6Game:
             except KeyboardInterrupt:
                 break
             except Exception as e:
-                raise e
-                # print(f"? Error: {str(e)}")
+                print(f"? Error: {str(e)}")
 
 if __name__ == "__main__":
     game = Connect6Game()

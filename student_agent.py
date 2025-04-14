@@ -41,7 +41,7 @@ def get_action(state, score):
     best_action, distribution = td_mcts.best_action_distribution(root)
 
     step_count += 1
-    if step_count % 100 == 0:
-        print(f"Step: {step_count}, Score: {score}.")
+    # if step_count % 100 == 0:
+    print(f"Step: {step_count}, Score: {score}.")
     
     return best_action
