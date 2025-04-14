@@ -33,7 +33,7 @@ jobs:
 
     - name: 4. Download models
       run: |
-        curl -L -o model.zip "https://drive.google.com/uc?export=download&id=17FpqB_P3hZu0w6QWY2Pp16FEo2suW2Ss"
+        curl -L "https://drive.usercontent.google.com/download?id=1Mk0vfEyBE4GKpvomfqHiLpTXGYHDtH_y&confirm=xxx" -o model.zip
         unzip model.zip
 
     - name: 5. Run Evaluation
