@@ -92,8 +92,8 @@ class Game2048Env(gym.Env):
         """Execute one action"""
         assert self.action_space.contains(action), "Invalid action"
 
-        # previous_score = self.score
-        previous_score = self.evaluate()
+        previous_score = self.score
+        # previous_score = self.evaluate()
 
         if self.cache_after_states[action] is None:
             self.simulate_move(action)

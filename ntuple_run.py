@@ -22,6 +22,8 @@ def test(num_games, approximator):
                 temp_env.board = env.board.copy()
                 temp_env.score = env.score
                 next_state, reward, _done = temp_env.step(action)
+                if _done:
+                    reward -= 100000
                 values.append(reward + approximator.get_value(next_state))
 
             
@@ -46,7 +48,7 @@ def test(num_games, approximator):
         f"Avg Max Tile: {avg_max_tile / num_games:.2f}"
     )
 
-NUM_GAMES = 10
+NUM_GAMES = 1
 if __name__ == "__main__":
     env = Game2048Env()  # Initialize the game environment
     approximator = NTupleApproximator()

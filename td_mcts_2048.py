@@ -47,7 +47,9 @@ class TD_MCTS:
             legal_moves = sim_env.get_legal_moves()
         def value(action):
             temp_env = copy.deepcopy(sim_env)
-            next_state, reward, _ = temp_env.step(action)
+            next_state, reward, _done = temp_env.step(action)
+            if _done:
+                reward -= 100000
             return reward + self.approximator.get_value(next_state)
         return max(legal_moves, key=lambda a: sum(value(a) for _ in range(3)) / 3)
     
@@ -55,6 +57,8 @@ class TD_MCTS:
         def value(action):
             temp_env = copy.deepcopy(sim_env)
             new_board, reward, _done, = temp_env.step(action)
+            if _done:
+                reward -= 100000
             return reward + self.approximator.get_value(new_board)
         
         total = sum(value(action) for _ in range(iteration))
@@ -92,6 +96,7 @@ class TD_MCTS:
             rollout_reward = self.rollout(sim_env, action)
         else:
             assert(sim_env.is_game_over())
+            rollout_reward = sim_env.score - 100000
             rollout_reward = sim_env.score # + sim_env.evaluate()
         
         # Backpropagation
@@ -130,25 +135,21 @@ def run_experiment(approximator: NTupleApproximator, iterations=50, exploration_
         state, reward, done = env.step(best_action)
         step += 1
         # print("Step: {}, Score: {}, Action: {}, Distribution: {}".format(step, env.score, best_action, distribution))
-        if step % 100 == 0:
-            print("Step: {}, Score: {}, Action: {}, Distribution: {}".format(step, env.score, best_action, distribution))
+        # if step % 100 == 0:
+        #     print("Step: {}, Score: {}, Action: {}, Distribution: {}".format(step, env.score, best_action, distribution))
 
     print("Final score: {}".format(env.score))
 
     return env.score
 
 if __name__ == "__main__":
-    import pickle
-
-    # with open("ntuple_approximator.pkl", 'rb') as f:
-    #     approximator = pickle.load(f)
     approximator = NTupleApproximator()
     approximator.load()
 
-    GAMES = 1
+    GAMES = 10
     scores = []
     for i in range(GAMES):
-        score = run_experiment(approximator, iterations=50, exploration_constant=10, rollout_depth=0)
+        score = run_experiment(approximator, iterations=10, exploration_constant=1, rollout_depth=0)
         scores.append(score)
         print("Game {}: Score {}".format(i + 1, score))
 

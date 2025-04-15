@@ -747,7 +747,7 @@ int main() {
   };
   auto approximator = NTupleApproximator(patterns);
   approximator.load("weights.txt");
-  train(300000, approximator, 0.1);
-  // test(1, approximator);
+  // train(300000, approximator, 0.1);
+  test(100, approximator);
   return 0;
 }

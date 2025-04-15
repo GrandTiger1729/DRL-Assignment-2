@@ -28,9 +28,9 @@ def evaluate_board(board: np.ndarray, color: int) -> float:
 
     if color == 1:
         if counts[0][4] > 0 or counts[0][5] > 0 or counts[0][6] > 0:
-            return 1.0
+            return 10.0
         if counts[1][5] > 0 or counts[1][6] > 0:
-            return -1.0
+            return -10.0
         
         me = np.argmax(counts[0][1:])
         opponent = np.argmax(counts[1][1:])
@@ -48,7 +48,7 @@ def evaluate_board(board: np.ndarray, color: int) -> float:
         return (me / 6) ** 3 - (opponent / 6)
 
 
-def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+def recommended_moves(board: np.ndarray, color: int, size=10, debug=False) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
     """Generates recommended moves for the given board and color."""
     n = board.shape[0]
     # Check instant win
@@ -56,9 +56,11 @@ def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tupl
         for j in range(n):
             for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
                 empty_cells = []
-                for k in range(6, 0, -1):
+                for k in range(5, -1, -1):
                     ni = i + di * k
                     nj = j + dj * k
+                    if debug and (i, j) == (6, 6):
+                        print(k, ni, nj)
                     if not (0 <= ni < n and 0 <= nj < n):
                         break
                     if board[ni, nj] == 3 - color:
@@ -72,17 +74,23 @@ def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tupl
                                 if board[_i, _j] == 0 and (_i, _j) != empty_cells[0]:
                                     return [(empty_cells[0], (_i, _j))]
                     if len(empty_cells) == 2:
-                        return [tuple(empty_cells)]
+                        return [(empty_cells[0], empty_cells[1])]
+                if debug and (i, j) == (6, 6):
+                    print("hehe", empty_cells, file=sys.stderr, flush=True)
+                    print(k, ni, nj, file=sys.stderr, flush=True)
     # Check for potential threats
-    visited = set()
+    if debug:
+        print(color, board, file=sys.stderr, flush=True)
     dangerous_cells = []
     for i in range(n):
         for j in range(n):
             for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
                 empty_cells = []
-                for k in range(6, 0, -1):
+                for k in range(5, -1, -1):
                     ni = i + di * k
                     nj = j + dj * k
+                    if debug and (i, j) == (8, 9):
+                        print(k, ni, nj)
                     if not (0 <= ni < n and 0 <= nj < n):
                         break
                     if board[ni, nj] == color:
@@ -91,22 +99,27 @@ def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tupl
                         empty_cells.append((ni, nj))
                 else:
                     if len(empty_cells) == 1:
-                        if empty_cells[0] not in visited:
+                        if debug:
+                            print("LEFT 1", empty_cells[0], file=sys.stderr, flush=True)
+                        if empty_cells[0] not in dangerous_cells:
                             dangerous_cells.append(empty_cells[0])
-                            visited.add(empty_cells[0])
-                    if len(empty_cells) == 2 and (abs(empty_cells[0][0] - empty_cells[1][0]) == 5 or abs(empty_cells[0][1] - empty_cells[1][1]) == 5):
-                        return [tuple(empty_cells)]
+                    if len(empty_cells) == 2 and (empty_cells[0][0] - 5 * di, empty_cells[0][1] - 5 * dj) == empty_cells[1]:
+                        return [(empty_cells[0], empty_cells[1])]
                 
     if len(dangerous_cells) >= 2:
+        if debug:
+            print("DANGEROUS", dangerous_cells, file=sys.stderr, flush=True)
         return [(dangerous_cells[0], dangerous_cells[1])]
-
+    
     for i in range(n):
         for j in range(n):
             for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
                 empty_cells = []
-                for k in range(6, 0, -1):
+                for k in range(5, -1, -1):
                     ni = i + di * k
                     nj = j + dj * k
+                    if debug and (i, j) == (8, 9):
+                        print(k, ni, nj)
                     if not (0 <= ni < n and 0 <= nj < n):
                         break
                     if board[ni, nj] == color:
@@ -114,15 +127,13 @@ def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tupl
                     if board[ni, nj] == 0:
                         empty_cells.append((ni, nj))
                 else:
-                    if len(empty_cells) == 1:
-                        if empty_cells[0] not in visited:
-                            dangerous_cells.append(empty_cells[0])
-                            visited.add(empty_cells[0])
                     if len(empty_cells) == 2:
-                        return [tuple(empty_cells)]
-                
-                if len(dangerous_cells) == 2:
-                    return [tuple(dangerous_cells)]
+                        if dangerous_cells and empty_cells[0] == dangerous_cells[0]:
+                            return [(empty_cells[0], empty_cells[1])]
+                        elif dangerous_cells:
+                            return [(empty_cells[1], empty_cells[0])]
+                        else:
+                            dangerous_cells.append(empty_cells[0])
 
     if len(dangerous_cells) == 1:
         board[dangerous_cells[0]] = color
@@ -137,7 +148,7 @@ def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tupl
             for di, dj in [(-1, -1), (-1, 0), (-1, 1), (0, -1)]:
                 color_count = [0, 0, 0]
                 empty_cells = []
-                for k in range(6, 0, -1):
+                for k in range(5, -1, -1):
                     ni = i + di * k
                     nj = j + dj * k
                     if not (0 <= ni < n and 0 <= nj < n):
@@ -156,6 +167,9 @@ def recommended_moves(board: np.ndarray, color: int, size=10) -> List[Tuple[Tupl
                             for y in empty_cells:
                                 if x != y:
                                     candidates[(x, y)] += 2 * color_count[color] ** 2 + color_count[3 - color] ** 2
+
+    if left == 1:
+        board[dangerous_cells[0]] = 0
     
     best_moves = sorted(candidates.items(), key=lambda x: x[1], reverse=True)[:size * 2]
     best_moves = [(x[0][0], x[0][1]) for i, x in enumerate(best_moves) if i % 2 == 0]
@@ -171,14 +185,14 @@ class MCTSNode:
         self.children: Dict[List[Tuple[int, int]], MCTSNode] = {}
         self.visits = 0
         self.total_reward = 0.0
-        self.untried_actions = recommended_moves(board, color)
+        self.untried_actions = recommended_moves(board.copy(), color)
 
     def fully_expanded(self):
         return len(self.untried_actions) == 0
     
 
 class MCTS:
-    def __init__(self, iterations=300, exploration_constant=1.41):
+    def __init__(self, iterations=300, exploration_constant=1):
         self.iterations = iterations
         self.c = exploration_constant  # Balances exploration and exploitation
 
@@ -355,7 +369,10 @@ class Connect6Game:
             print(move_str, file=sys.stderr)
             return
         
-        root = MCTSNode(self.board, self.turn)
+        turn = 1 if color.upper() == 'B' else 2
+        # recommended_moves(self.board.copy(), turn, size=10, debug=True)
+
+        root = MCTSNode(self.board, turn)
         mcts = MCTS()
         for _ in range(mcts.iterations):
             mcts.simulate(root)
@@ -367,7 +384,7 @@ class Connect6Game:
         self.play_move(color, move_str)
 
         print(f"{move_str}\n\n", end='', flush=True)
-        print(move_str, file=sys.stderr)
+        # print(selected, file=sys.stderr)
 
     def show_board(self):
         """Displays the board as text."""
@@ -435,6 +452,7 @@ class Connect6Game:
             except KeyboardInterrupt:
                 break
             except Exception as e:
+                raise e
                 print(f"? Error: {str(e)}")
 
 if __name__ == "__main__":

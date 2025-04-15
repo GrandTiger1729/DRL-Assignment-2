@@ -32,7 +32,7 @@ def get_action(state, score):
 
     # return best_action
 
-    td_mcts = TD_MCTS(approximator, iterations=100, exploration_constant=100, rollout_depth=0)
+    td_mcts = TD_MCTS(approximator, iterations=10, exploration_constant=0.1, rollout_depth=0)
 
     root = TD_MCTS_Node()
     for _ in range(td_mcts.iterations):
@@ -41,7 +41,7 @@ def get_action(state, score):
     best_action, distribution = td_mcts.best_action_distribution(root)
 
     step_count += 1
-    # if step_count % 100 == 0:
-    print(f"Step: {step_count}, Score: {score}.")
+    if step_count % 50 == 0:
+        print(f"Step: {step_count}, Score: {score}, Distribution: {distribution}")
     
     return best_action
